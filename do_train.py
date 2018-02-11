@@ -13,7 +13,7 @@ train_label_file = 'data/train_label.csv'
 train_data_file = 'data/train_data.csv'
 
 class FACE_CSV_ITER(mx.io.DataIter):
-    def __init__(self,batchSize):
+    def __init__(self,path_prefix,batchSize):
         self.batchSize_ = batchSize
         self.provideData_ = [
                 mx.io.DataDesc("data", (batchSize,1,96,96), np.float32)
@@ -21,18 +21,19 @@ class FACE_CSV_ITER(mx.io.DataIter):
         self.provideLabel_ = [
                 mx.io.DataDesc("softmax_label",(batchSize,30),np.float32)
                 ]
-        self.train_fd_ = open(train_data_file,'rb')
-        self.label_fd_ = open(train_label_file,'rb')
-        self.train_csv_ = csv.reader(self.train_fd_, delimiter=',')
+       
+        self.data_fd_ = open(path_prefix + "data.csv",'rb')
+        self.label_fd_ = open(path_prefix + 'label.csv','rb')
+        self.data_csv_ = csv.reader(self.data_fd_, delimiter=',')
         self.label_csv_ = csv.reader(self.label_fd_,delimiter=',')
         return
     def __iter__(self):
         return self
     def reset(self):
-        self.train_csv_.seek(0)
-        self.label_csv_.seek(0)
-        self.train_csv = csv.reader( self.train_csv_, delimiter=',')
-        self.label_csv = csv.reader( self.label_csv_,delimiter=',')
+        self.data_fd_.seek(0)
+        self.label_fd_.seek(0)
+        self.data_csv = csv.reader( self.data_fd_, delimiter=',')
+        self.label_csv = csv.reader( self.label_fd_,delimiter=',')
         return
     def __next__(self):
         return self.next()
@@ -47,7 +48,7 @@ class FACE_CSV_ITER(mx.io.DataIter):
         Ys = []
         try:
             for k in range(self.batchSize_):
-                X = [np.float(x) for x in next(self.train_csv_)]
+                X = [np.float(x) for x in next(self.data_csv_)]
                 Y = [np.float(x) for x in next(self.label_csv_)]
                 X = np.asarray( np.reshape(X,(1,96,96)))
                 Xs.append(X)
@@ -61,7 +62,7 @@ class FACE_CSV_ITER(mx.io.DataIter):
                 self.next()
                 pad = self.batchSize_ - data_read
                 for k in range(pad):
-                    X = [np.float(x) for x in next(self.train_csv_)]
+                    X = [np.float(x) for x in next(self.data_csv_)]
                     Y = [np.float(x) for x in next(self.label_csv_)]
                     X = np.asarray( np.reshape(X,(1,96,96)))
                     Xs.append(X)
@@ -75,7 +76,7 @@ class FACE_CSV_ITER(mx.io.DataIter):
 
 
 def test_face_csv_iter():
-    csviter = FACE_CSV_ITER(10)
+    csviter = FACE_CSV_ITER('data/split_test_',10)
     print csviter.provide_data, ',', csviter.provide_label
     k = 0
     for batch in csviter:
@@ -121,6 +122,12 @@ def cnn(outputSize = 30):
     return mx.mod.Module(symbol = symbol,context = mx.cpu())
     
 def get_train_iter(batchSize = 100,outputSize = 30):
+
+    train_iter = FACE_CSV_ITER('data/split_train_',batchSize)
+    test_iter = FACE_CSV_ITER('data/split_test_',batchSize)
+    return (train_iter, test_iter)
+
+
     train = []
     test = []
     
@@ -161,8 +168,8 @@ def get_train_iter(batchSize = 100,outputSize = 30):
     return (train_iter, test_iter)
     
 if __name__ == "__main__":
-    test_face_csv_iter()
-    print 'ok....'
+#    test_face_csv_iter()
+#    print 'ok....'
     batchSize = 10
     outputSize = 30
     train_iter,test_iter = get_train_iter(batchSize, outputSize)
