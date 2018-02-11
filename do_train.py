@@ -7,9 +7,83 @@ import matplotlib.pyplot as plt
 import logging
 import mxnet as mx
 import random
+import csv
 
 train_label_file = 'data/train_label.csv'
 train_data_file = 'data/train_data.csv'
+
+class FACE_CSV_ITER(mx.io.DataIter):
+    def __init__(self,batchSize):
+        self.batchSize_ = batchSize
+        self.provideData_ = [
+                mx.io.DataDesc("data", (batchSize,1,96,96), np.float32)
+                ]
+        self.provideLabel_ = [
+                mx.io.DataDesc("softmax_label",(batchSize,30),np.float32)
+                ]
+        self.train_fd_ = open(train_data_file,'rb')
+        self.label_fd_ = open(train_label_file,'rb')
+        self.train_csv_ = csv.reader(self.train_fd_, delimiter=',')
+        self.label_csv_ = csv.reader(self.label_fd_,delimiter=',')
+        return
+    def __iter__(self):
+        return self
+    def reset(self):
+        self.train_csv_.seek(0)
+        self.label_csv_.seek(0)
+        self.train_csv = csv.reader( self.train_csv_, delimiter=',')
+        self.label_csv = csv.reader( self.label_csv_,delimiter=',')
+        return
+    def __next__(self):
+        return self.next()
+    @property
+    def provide_data(self):
+        return self.provideData_
+    @property
+    def provide_label(self):
+        return self.provideLabel_
+    def next(self):
+        Xs = []
+        Ys = []
+        try:
+            for k in range(self.batchSize_):
+                X = [np.float(x) for x in next(self.train_csv_)]
+                Y = [np.float(x) for x in next(self.label_csv_)]
+                X = np.asarray( np.reshape(X,(1,96,96)))
+                Xs.append(X)
+                Ys.append(Y)
+            Xs = [ mx.nd.array(Xs)  ]
+            Ys = [ mx.nd.array(Ys) ]
+            return mx.io.DataBatch(data = Xs, label = Ys)
+        except StopIteration:
+            data_read = len(Xs)
+            if data_read > 0:
+                self.next()
+                pad = self.batchSize_ - data_read
+                for k in range(pad):
+                    X = [np.float(x) for x in next(self.train_csv_)]
+                    Y = [np.float(x) for x in next(self.label_csv_)]
+                    X = np.asarray( np.reshape(X,(1,96,96)))
+                    Xs.append(X)
+                    Ys.append(Y)
+                Xs = [ mx.nd.array(Xs) ]
+                Ys = [ mx.nd.array(Ys) ]
+                return mx.io.DataBatch(data = Xs, label = Ys)
+            else:
+                raise StopIteration
+        return
+
+
+def test_face_csv_iter():
+    csviter = FACE_CSV_ITER(10)
+    print csviter.provide_data, ',', csviter.provide_label
+    k = 0
+    for batch in csviter:
+        print k,',',str(batch)
+        k += 1
+    csviter.reset()
+    return
+
 
 def cnn(outputSize = 30):
     data = mx.sym.var('data')
@@ -87,6 +161,8 @@ def get_train_iter(batchSize = 100,outputSize = 30):
     return (train_iter, test_iter)
     
 if __name__ == "__main__":
+    test_face_csv_iter()
+    print 'ok....'
     batchSize = 10
     outputSize = 30
     train_iter,test_iter = get_train_iter(batchSize, outputSize)
