@@ -1,7 +1,7 @@
 import os,sys,pdb
 import numpy as np
 import pandas as pd
-
+import random
 sourcefile = 'training.csv'
 datafile = 'train_data.csv'
 labelfile ='train_label.csv'
@@ -31,8 +31,29 @@ with open(sourcefile,'rb') as f:
         Ys.append(Y)
         Xs.append(X)
 
-with open('train_data.csv', 'wb') as f:
-    f.writelines('\r\n'.join(Xs))
 
-with open('train_label.csv', 'wb') as f:
-    f.writelines('\r\n'.join(Ys))
+trainXYs = []
+testXYs = []
+k =0
+for x,y in zip(Xs,Ys):
+    if k % 5 == 0:
+        testXYs.append(  (x,y) )
+    else:
+        trainXYs.append( (x,y) )
+    k += 1
+random.shuffle(trainXYs)
+
+def save_csv(XYs, path_prefix):
+    Xs = []
+    Ys = []
+    for xy in XYs:
+        x,y = xy
+        Xs.append( x )
+        Ys.append( y )
+    with open( path_prefix + 'data.csv', 'wb') as f:
+        f.writelines('\r\n'.join(Xs) )
+    with open( path_prefix + 'label.csv','wb') as f:
+        f.writelines('\r\n'.join(Ys))
+    return
+save_csv(trainXYs, 'split_train_')
+save_csv(testXYs,'split_test_')
