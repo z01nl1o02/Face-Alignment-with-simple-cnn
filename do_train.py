@@ -120,6 +120,13 @@ def cnn(outputSize = 30):
     
     #mx.viz.plot_network(symbol).view()
     return mx.mod.Module(symbol = symbol,context = mx.cpu())
+
+
+def plot_sample(x, y, axis):
+    img = x.reshape(96, 96)
+    axis.imshow(img, cmap='gray')
+    axis.scatter(y[0::2]*48+48, y[1::2]*48+48, marker='x', s=10)
+
     
 def get_train_iter(batchSize = 100,outputSize = 30):
 
@@ -167,22 +174,43 @@ def get_train_iter(batchSize = 100,outputSize = 30):
     test_iter = mx.io.NDArrayIter(testX,testY,batchSize)
     return (train_iter, test_iter)
     
-if __name__ == "__main__":
-#    test_face_csv_iter()
-#    print 'ok....'
+
+def  error_log(freq, loglist):
+    def _callback(param):
+        if param.nbatch % freq == 0:
+            name,value = param.eval_metric.get()
+            loglist.append(value)
+    return _callback
+
+def run():
+    
     batchSize = 10
     outputSize = 30
     train_iter,test_iter = get_train_iter(batchSize, outputSize)
     
     model = cnn(outputSize)
-    
+   
+    train_errors = []
+    test_errors = []
     head = '%(asctime)-15s %(message)s'
     logging.basicConfig(level=logging.DEBUG, format=head) #enable log out
     model.fit(train_iter, eval_data = test_iter, optimizer='sgd',
     optimizer_params={'learning_rate':0.1,'wd':0.00}, #weight decay
         eval_metric='mse',
-        batch_end_callback=mx.callback.Speedometer(batchSize,100),
-        epoch_end_callback=mx.callback.do_checkpoint(".\\"),
-        num_epoch=2000)
+        batch_end_callback=error_log(1, train_errors),
+        eval_batch_end_callback = error_log(1,test_errors),
+        epoch_end_callback=mx.callback.do_checkpoint("model"),
+        num_epoch=200)
+    train_errors = np.asarray(train_errors)
+    test_errors = np.asarray(test_errors)
+    plt.plot(np.asarray( range(train_errors.size)), train_errors, label = 'train error')
+    plt.plot(np.asarray( range(test_errors.size)), test_errors, label = 'test error')
+    plt.legend(loc = 'upper right')
+    plt.xlabel('batch number')
+    plt.ylabel('error')
+    plt.gca().set_ylim(bottom = 0)
+    plt.show()
             
- 
+
+if __name__=="__main__":
+    run()
